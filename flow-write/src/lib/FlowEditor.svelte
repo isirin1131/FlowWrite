@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { SvelteFlow } from '@xyflow/svelte';
+  import { SvelteFlow, Background } from '@xyflow/svelte';
   import '@xyflow/svelte/dist/style.css';
 
   let nodes = $state.raw([
@@ -13,7 +13,9 @@
 </script>
 
 <div class="flow-editor">
-  <SvelteFlow bind:nodes bind:edges />
+  <SvelteFlow bind:nodes bind:edges>
+    <Background />
+  </SvelteFlow>
 </div>
 
 <style>
