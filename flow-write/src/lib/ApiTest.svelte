@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { OpenAICompatibleClient, buildChatRequest } from './api/client';
   import type {
     ChatMessage,
     ChatCompletionRequest,
     UsageInfo
   } from './api/types';
+  import { saveSetting, loadSetting, SETTINGS_KEYS } from './db/settings';
 
   // ============================================================================
   // State Types
@@ -53,6 +55,83 @@
   });
 
   let abortController: AbortController | null = null;
+  let isLoaded = $state(false);
+
+  // ============================================================================
+  // Persistence
+  // ============================================================================
+
+  onMount(async () => {
+    // Load saved settings
+    endpoint = await loadSetting(SETTINGS_KEYS.API_TEST_ENDPOINT, 'https://api.openai.com/v1');
+    apiKey = await loadSetting(SETTINGS_KEYS.API_TEST_API_KEY, '');
+    model = await loadSetting(SETTINGS_KEYS.API_TEST_MODEL, 'gpt-4o');
+    temperature = await loadSetting(SETTINGS_KEYS.API_TEST_TEMPERATURE, 0.7);
+    maxTokens = await loadSetting(SETTINGS_KEYS.API_TEST_MAX_TOKENS, 4096);
+    topP = await loadSetting(SETTINGS_KEYS.API_TEST_TOP_P, 1);
+    streaming = await loadSetting(SETTINGS_KEYS.API_TEST_STREAMING, true);
+    stopSequences = await loadSetting(SETTINGS_KEYS.API_TEST_STOP_SEQUENCES, []);
+    systemPrompt = await loadSetting(SETTINGS_KEYS.API_TEST_SYSTEM_PROMPT, '');
+    messages = await loadSetting(SETTINGS_KEYS.API_TEST_MESSAGES, []);
+    showSettings = await loadSetting(SETTINGS_KEYS.PREFERENCES_SHOW_SETTINGS, true);
+    isLoaded = true;
+  });
+
+  // Save settings when they change (debounced via $effect)
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_ENDPOINT, endpoint);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_API_KEY, apiKey);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_MODEL, model);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_TEMPERATURE, temperature);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_MAX_TOKENS, maxTokens);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_TOP_P, topP);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_STREAMING, streaming);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_STOP_SEQUENCES, stopSequences);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_SYSTEM_PROMPT, systemPrompt);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.API_TEST_MESSAGES, messages);
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.PREFERENCES_SHOW_SETTINGS, showSettings);
+  });
 
   // ============================================================================
   // Helpers

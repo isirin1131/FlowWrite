@@ -19,6 +19,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
-    "@xyflow/svelte": "^1.5.0"
+    "@xyflow/svelte": "^1.5.0",
+    "dexie": "^4.2.1"
   }
 }

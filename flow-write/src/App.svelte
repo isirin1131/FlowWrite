@@ -1,10 +1,23 @@
 <script>
+  import { onMount } from 'svelte';
   import NavBar from './lib/NavBar.svelte';
   import FlowEditor from './lib/FlowEditor.svelte';
   import ApiTest from './lib/ApiTest.svelte';
   import FloatingBall from './lib/FloatingBall.svelte';
+  import { saveSetting, loadSetting, SETTINGS_KEYS } from './lib/db/settings';
 
   let activePage = $state('flow');
+  let isLoaded = $state(false);
+
+  onMount(async () => {
+    activePage = await loadSetting(SETTINGS_KEYS.PREFERENCES_ACTIVE_PAGE, 'flow');
+    isLoaded = true;
+  });
+
+  $effect(() => {
+    if (!isLoaded) return;
+    saveSetting(SETTINGS_KEYS.PREFERENCES_ACTIVE_PAGE, activePage);
+  });
 </script>
 
 <div class="app">

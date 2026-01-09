@@ -181,11 +181,6 @@ getListContent(final);
 // => '请参照以下要求：要求内容...\n\n将以下内容进行总结：\n源文本内容...'
 ```
 
-\
-\
-\
-\
-
 === API 配置系统 (ApiConfiguration)
 
 API 配置是 FlowWrite 的核心组件，它将连接设置、请求参数和提示词统一封装。这一设计使得每个节点都是一个完整的、自包含的 LLM API 调用单元。
@@ -468,3 +463,161 @@ const result = await executeWorkflow(workflow, executor);
    └─────────┘
 ```
 
+= 数据持久化
+
+FlowWrite 使用 IndexedDB 实现本地数据持久化，通过 Dexie.js 库提供简洁的 API。采用文档导向的存储模式，将复杂对象以 JSON 形式存储。
+
+== 存储架构
+
+=== 数据库结构
+
+```typescript
+// 两张表，简洁高效
+class FlowWriteDB extends Dexie {
+  workflows!: Table<WorkflowRecord>;  // 工作流存储
+  settings!: Table<SettingsRecord>;   // 设置存储
+
+  constructor() {
+    super('FlowWriteDB');
+    this.version(1).stores({
+      workflows: 'id, name, updatedAt',
+      settings: 'key'
+    });
+  }
+}
+```
+
+=== 工作流存储 (WorkflowRecord)
+
+```typescript
+interface WorkflowRecord {
+  id: string;        // 主键
+  name: string;      // 工作流名称
+  data: string;      // JSON.stringify(Workflow) - 完整工作流数据
+  createdAt: number; // 创建时间戳
+  updatedAt: number; // 更新时间戳
+}
+```
+
+采用文档导向存储的原因：
+- TextBlockList 包含嵌套对象（TextBlock、VirtualTextBlock）
+- ApiConfiguration 结构深度嵌套
+- 工作流很少按内部字段查询
+- 序列化/反序列化更简单
+
+=== 设置存储 (SettingsRecord)
+
+```typescript
+interface SettingsRecord {
+  key: string;       // 主键（如 'apiTest:endpoint'）
+  value: string;     // JSON.stringify(value)
+  updatedAt: number; // 更新时间戳
+}
+```
+
+预定义的设置键：
+- `apiTest:endpoint` - API 端点 URL
+- `apiTest:apiKey` - API 密钥
+- `apiTest:model` - 模型标识符
+- `apiTest:temperature` - 采样温度
+- `apiTest:maxTokens` - 最大 token 数
+- `apiTest:systemPrompt` - 系统提示词
+- `apiTest:messages` - 对话历史
+- `preferences:activePage` - 当前页面
+
+== 数据访问层
+
+=== 工作流操作
+
+```typescript
+// 保存工作流
+async function saveWorkflow(workflow: Workflow): Promise<void>
+
+// 加载工作流
+async function loadWorkflow(id: string): Promise<Workflow | null>
+
+// 列出所有工作流（仅摘要）
+async function listWorkflows(): Promise<WorkflowSummary[]>
+
+// 删除工作流
+async function deleteWorkflow(id: string): Promise<void>
+```
+
+=== 设置操作
+
+```typescript
+// 保存设置
+async function saveSetting<T>(key: string, value: T): Promise<void>
+
+// 加载设置（带默认值）
+async function loadSetting<T>(key: string, defaultValue: T): Promise<T>
+
+// 批量保存
+async function saveSettings(settings: Record<string, unknown>): Promise<void>
+
+// 批量加载
+async function loadSettings<T>(defaults: T): Promise<T>
+```
+
+== 响应式持久化
+
+利用 Svelte 5 的 `$effect` 实现自动保存：
+
+```typescript
+let isLoaded = $state(false);
+
+// 组件挂载时加载数据
+onMount(async () => {
+  endpoint = await loadSetting('apiTest:endpoint', 'https://api.openai.com/v1');
+  apiKey = await loadSetting('apiTest:apiKey', '');
+  // ...
+  isLoaded = true;
+});
+
+// 数据变化时自动保存
+$effect(() => {
+  if (!isLoaded) return;  // 防止保存默认值
+  saveSetting('apiTest:endpoint', endpoint);
+});
+```
+
+关键设计：
+- `isLoaded` 标志防止在加载完成前保存默认值
+- 每个状态变量独立的 `$effect` 实现细粒度保存
+- 异步操作不阻塞 UI
+
+== 序列化处理
+
+由于 `Workflow.nodes` 是 `Map` 类型，需要特殊处理：
+
+```typescript
+// 序列化：Map → Array
+function serializeWorkflow(workflow: Workflow): string {
+  const serializable = {
+    ...workflow,
+    nodes: Array.from(workflow.nodes.entries())
+  };
+  return JSON.stringify(serializable);
+}
+
+// 反序列化：Array → Map
+function deserializeWorkflow(data: string): Workflow {
+  const parsed = JSON.parse(data);
+  return {
+    ...parsed,
+    nodes: new Map(parsed.nodes)
+  };
+}
+```
+
+== 安全考虑
+
+API 密钥存储在 IndexedDB 中，具有以下特性：
+- 同源隔离：其他网站无法访问
+- 本地存储：数据不会发送到服务器
+- 未加密：目前以明文存储（未来可添加加密层）
+
+未来增强方向：
+- 使用用户密码派生密钥进行加密
+- 支持密钥导入/导出
+- 会话级别的临时存储选项
