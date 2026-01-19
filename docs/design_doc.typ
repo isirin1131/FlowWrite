@@ -1,81 +1,96 @@
-#import "@preview/basic-document-props:0.1.0": simple-page
-#show: simple-page.with("折彩", "", middle-text: "FlowWrite 产品设计文档", date: true, numbering: true, supress-mail-link: false)
-
 #set text(font: ("Sarasa Fixed Slab SC"), lang:("zh"))
 #show math.equation: set text(font: "Neo Euler")
 
-FlowWrite 是一款专为 AI 辅助文字创作而生的可视化工作流编辑器。本文档聚焦于产品核心功能设计，探索文本处理与创意写作的全新交互范式。
+= FlowWrite 产品设计文档 v2
+
+*日期: 2026.01.19*
+
+FlowWrite 是一款专为 AI 辅助文字创作而生的可视化工作流编辑器。本文档是基于 v1 设计文档的重构版本，核心变化是 *分离 metadata 与 running-state*，并引入 *EventBus 通信机制*。
 
 #outline()
 
-
 #line(length: 100%)
+
 = 产品愿景
 
 FlowWrite 致力于成为 AI 时代文字创作者的得力助手，通过直观的可视化工作流，让复杂的 AI 赋能文本处理变得简单而优雅。
 
-== 缘起
-
-在 AI 写作实践中，创作者往往需要在多个工具间频繁切换，prompt 的调试、文本的迭代、创意的碰撞都充满了重复性的复制粘贴操作。FlowWrite 诞生于这样的痛点：我们渴望一个场景覆盖足够大的创作范式，让文字工作者能够专注于内容本身。
-
-== 理念
-
-AI 可以大幅提高写作的效率，但真正的创作往往需要反复打磨和人工干预。我们借鉴 ComfyUI 的节点化思想，为文本创作领域打造一个灵活、可定制的可视化工作流系统。我们希望以这样的方式，让文字创作者享受 “人剑合一” 的创作体验。
-
 == 核心功能
 
-- *节点化文本处理*：将复杂的 AI 流程操作拆解为（低耦合的）基于节点的工作流
+- *节点化文本处理*：将复杂的 AI 流程操作拆解为基于节点的工作流
 - *实时依赖解析*：智能处理节点间的数据流转与依赖关系
 - *创作友好设计*：为文字工作者的使用习惯深度优化
 
-= workflow 功能模块的总体设计
+#line(length: 100%)
 
-基于对交互方式的设想，我们发现具体组件的设计可以是低耦合而优雅的。
+= 架构总览
 
-== 交互方式
-
-一个节点代表一次 LLM 的 api 调用，也就是一次对话。一个节点的输入可以是多个，输出是唯一的，但可以作为多个节点的输入。那么一个节点的多个输入该如何被应用到这个节点的对话中？其实基于定制化的思路，基本上是这样一个形态:
+== 分层架构
 
 ```
-
-┌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┐
-╎ [第一个输入]                                                    ╎
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-╎ 请参照上面的要求，将以下三次 LLM 对话的输出总结成一个：                ╎
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-╎ [第二个输入]                                                     ╎
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-╎ [第三个输入]                                                     ╎
-├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
-╎ [第四个输入]                                                     ╎
-└╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘
+┌──────────────────────────────────────────────────┐
+│                    UI Layer                      │
+│  ┌────────────┐  ┌────────────┐  ┌────────────┐ │
+│  │FloatingBall│  │ FlowEditor │  │  ApiTest   │ │
+│  └─────┬──────┘  └─────┬──────┘  └─────┬──────┘ │
+│        └───────────────┼───────────────┘        │
+│                        │                        │
+│                ┌───────▼───────┐                │
+│                │   EventBus    │                │
+│                └───────┬───────┘                │
+│                        │                        │
+├────────────────────────┼────────────────────────┤
+│                ┌───────▼───────┐                │
+│                │  core-runner  │  ← 运行时层     │
+│                └───────┬───────┘                │
+│                        │                        │
+│         ┌──────────────┼──────────────┐         │
+│         ▼              ▼              ▼         │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐     │
+│   │   core   │  │    db    │  │   api    │     │
+│   │(metadata)│  │          │  │          │     │
+│   └──────────┘  └──────────┘  └──────────┘     │
+└──────────────────────────────────────────────────┘
 ```
 
-也就是说，某个节点的输出在还没有具体从一次 LLM 对话中产生的时候，就已经预订好了它在另一个节点的输入中所扮演的角色，这个设计催生了一些前期设想，如占位文本块，或是文本块引用的概念，前者使得一个节点可以不依赖于与其它节点的连接关系来定义，后者使得非节点输出（也就是不是从AI侧获取而是由用户自定义的文本）的文本块也可以共享状态（改一处其它地方也会改）
+== 核心设计原则
 
-基于这类设计，工作流的运行主要是类似拓扑解析依赖的过程，当然后续可以加一些对有向环支持的花活。
+=== 原则一：metadata 与 running-state 分离
 
-注意到，前面提到的这两种设想似乎可以合并成一个虚拟文本块的概念。而且要加一个可以在工作流中暂时 freeze 一个虚拟文本块的功能，使得这个虚拟文本块在后续的使用中表现的就像一个普通文本块（这个可能会成为一个很常用的功能）。
+#table(
+  columns: (auto, auto, auto),
+  inset: 8pt,
+  align: horizon,
+  [*层*], [*数据类型*], [*特性*],
+  [core/], [metadata], [静态定义、可序列化、持久化],
+  [core-runner/], [running-state], [运行时状态、易失、不持久化],
+)
 
-不过普通文本块的引用功能还是禁掉吧，感觉没啥意义。
+*metadata 示例*：节点 ID、名称、位置、API 配置、文本块定义
 
-综合来看，状态设计不会很复杂。
+*running-state 示例*：执行状态（running/pending/error）、已解析的输出内容、冻结状态
 
-\
-\
-\
-\
-\
+=== 原则二：EventBus 作为唯一跨层通信机制
 
-== 组件设计
+- UI 层不直接调用 core-runner 的方法
+- 所有跨层通信通过 EventBus 消息
+- 消息流最多三层：UI → core-runner → UI，不会形成链式循环
 
-=== 文本块系统
+=== 原则三：UI 层锁定机制
 
-文本块是 FlowWrite 中最基础的数据单元，用于构建节点的输入内容。系统设计了三种核心抽象：
+- 工作流执行期间，UI 层进入锁定状态
+- 锁定期间禁止节点编辑、删除、连接等操作
+- 防止 running-state 与 UI 操作产生冲突
 
-==== 基础文本块 (TextBlock)
+#line(length: 100%)
 
-最简单的文本单元，包含静态的文本内容，不依赖任何外部状态。
+= Core 层设计（metadata）
+
+Core 层只包含静态定义，所有类型都可直接 `JSON.stringify`。
+
+== 文本块系统
+
+=== TextBlock（基础文本块）
 
 ```typescript
 interface TextBlock {
@@ -90,294 +105,485 @@ interface TextBlock {
 - 始终处于就绪状态
 - 不参与依赖解析
 
-==== 虚拟文本块 (VirtualTextBlock)
-
-动态文本单元，引用某个节点的输出。这是实现节点间数据流转的关键抽象。
+=== VirtualTextBlockDef（虚拟文本块定义）
 
 ```typescript
-interface VirtualTextBlock {
+interface VirtualTextBlockDef {
   readonly type: 'virtual';
   readonly id: TextBlockId;
-  readonly sourceNodeId: NodeId;    // 引用的源节点
-  state: 'pending' | 'resolved' | 'error';
-  resolvedContent: string | null;   // 解析后的内容
-  frozen: boolean;                  // 冻结状态
-  displayName?: string;             // 占位显示名称
+  readonly sourceNodeId: NodeId;  // 引用的源节点
+  displayName?: string;           // 占位显示名称
 }
 ```
 
-状态流转：
-- `pending`: 源节点尚未执行，显示为占位符 `[节点名称]`
-- `resolved`: 源节点已产出内容，显示实际文本
-- `error`: 源节点执行失败，显示错误占位符
+*关键变化*：v1 中的 `state`、`resolvedContent`、`frozen` 字段移至 core-runner 层。
 
-冻结功能：
-- 当 `frozen = true` 时，虚拟文本块表现为普通文本块
-- 冻结后不再响应源节点的更新
-- 适用于需要"快照"某个中间结果的场景
+VirtualTextBlockDef 只描述"这个文本块引用哪个节点"，不包含运行时状态。
 
-==== 文本块列表 (TextBlockList)
-
-文本块的有序容器，代表一个节点的完整输入内容。
+=== TextBlockList
 
 ```typescript
+type AnyTextBlockDef = TextBlock | VirtualTextBlockDef;
+
 interface TextBlockList {
   readonly id: string;
-  blocks: AnyTextBlock[];  // TextBlock | VirtualTextBlock
+  blocks: AnyTextBlockDef[];
 }
 ```
 
 核心操作：
-- `getListContent()`: 拼接所有块的内容，生成最终 prompt
-- `isListReady()`: 检查所有块是否就绪（可用于判断节点能否执行）
-- `getDependencies()`: 获取所有未冻结的虚拟块依赖的节点 ID 列表
-- `resolveNodeOutput()`: 当某节点产出内容时，更新所有引用该节点的虚拟块
+- `getDependencies(list)`: 获取所有虚拟块依赖的节点 ID 列表
+- `appendBlock(list, block)`: 追加文本块
+- `removeBlock(list, blockId)`: 移除文本块
 
-=== 依赖解析
+== API 配置系统
 
-基于文本块列表的 `getDependencies()` 方法，可以构建节点间的依赖图：
-
-```
-Node A ──────────────────────────┐
-                                 ▼
-Node B ──┬───────────────────► Node D
-         │                       ▲
-Node C ──┘───────────────────────┘
-```
-
-工作流执行时，按拓扑顺序依次执行节点：
-1. 收集所有节点的依赖关系
-2. 找出无依赖的节点，优先执行
-3. 节点执行完成后，通过 `resolveNodeOutput()` 更新下游节点的虚拟块
-4. 重复步骤 2-3 直到所有节点执行完毕
-
-=== 使用示例
-
-```typescript
-// 创建一个节点的输入内容
-const inputList = createTextBlockList([
-  createTextBlock('请参照以下要求：'),
-  createVirtualTextBlock('node-requirements', '要求'),
-  createTextBlock('\n\n将以下内容进行总结：\n'),
-  createVirtualTextBlock('node-source', '源文本'),
-]);
-
-// 检查依赖
-const deps = getDependencies(inputList);
-// => ['node-requirements', 'node-source']
-
-// 当 node-requirements 执行完成
-const updated = resolveNodeOutput(inputList, 'node-requirements', '要求内容...');
-
-// 检查是否就绪
-isListReady(updated); // => false (node-source 仍为 pending)
-
-// 当所有依赖都解析完成后
-const final = resolveNodeOutput(updated, 'node-source', '源文本内容...');
-isListReady(final); // => true
-
-// 获取最终 prompt
-getListContent(final);
-// => '请参照以下要求：要求内容...\n\n将以下内容进行总结：\n源文本内容...'
-```
-
-=== API 配置系统 (ApiConfiguration)
-
-API 配置是 FlowWrite 的核心组件，它将连接设置、请求参数和提示词统一封装。这一设计使得每个节点都是一个完整的、自包含的 LLM API 调用单元。
-
-==== 连接设置 (ApiConnection)
+=== ApiConnection
 
 ```typescript
 interface ApiConnection {
-  endpoint: string;  // OpenAI 兼容的 API 端点 URL
+  endpoint: string;  // OpenAI 兼容的 API 端点
   apiKey: string;    // API 密钥
   model: string;     // 模型标识符
 }
 ```
 
-FlowWrite 采用 OpenAI 兼容的 API 格式，这意味着任何支持 `/chat/completions` 端点的服务都可以接入，包括 OpenAI、DeepSeek、本地 LLM 服务器等。
-
-==== 请求参数 (ApiParameters)
+=== ApiParameters
 
 ```typescript
 interface ApiParameters {
-  temperature: number;       // 采样温度 (0-2)
-  maxTokens: number;         // 最大生成 token 数
-  topP: number;              // 核采样参数 (0-1)
-  presencePenalty: number;   // 存在惩罚 (-2 到 2)
-  frequencyPenalty: number;  // 频率惩罚 (-2 到 2)
-  stopSequences: string[];   // 停止序列
-  streaming: boolean;        // 是否启用流式响应
+  temperature: number;
+  maxTokens: number;
+  topP: number;
+  presencePenalty: number;
+  frequencyPenalty: number;
+  stopSequences: string[];
+  streaming: boolean;
 }
 ```
 
-==== 完整配置结构
+=== ApiConfiguration
 
 ```typescript
 interface ApiConfiguration {
-  connection: ApiConnection;      // 连接设置
-  parameters: ApiParameters;      // 请求参数
-  systemPrompt: TextBlockList;    // 系统提示词（支持虚拟文本块）
-  userPrompt: TextBlockList;      // 用户提示词（支持虚拟文本块）
+  connection: ApiConnection;
+  parameters: ApiParameters;
+  systemPrompt: TextBlockList;  // 可包含虚拟文本块
+  userPrompt: TextBlockList;    // 可包含虚拟文本块
 }
 ```
 
-关键设计决策：*`systemPrompt` 和 `userPrompt` 都是 `TextBlockList` 类型*，这意味着它们都可以包含虚拟文本块，从而实现：
-- 系统提示词可以引用其他节点的输出
-- 用户提示词可以组合多个上游节点的结果
-- 依赖关系统一从两个提示词中解析
+== 节点系统
 
-==== 核心操作
-
-- `createApiConfiguration()`: 创建带默认值的配置
-- `getApiConfigDependencies(config)`: 获取系统和用户提示词中所有依赖的节点 ID
-- `isApiConfigReady(config)`: 检查所有虚拟块是否已解析
-- `getSystemPromptContent(config)`: 获取最终的系统提示词字符串
-- `getUserPromptContent(config)`: 获取最终的用户提示词字符串
-- `resolveApiConfigOutput(config, nodeId, content)`: 更新两个提示词中引用指定节点的虚拟块
-
-=== 节点系统 (Node)
-
-节点是工作流的核心执行单元，代表一次 LLM API 调用。每个节点包含完整的 API 配置。
-
-==== 节点结构
+=== NodeDefinition（节点定义）
 
 ```typescript
-interface Node {
+interface NodeDefinition {
   readonly id: NodeId;
-  name: string;                       // 显示名称
-  apiConfig: ApiConfiguration;        // API 配置（连接、参数、提示词）
-  output: TextBlock | null;           // LLM 输出（执行完成后填充）
-  state: NodeState;                   // 执行状态
-  errorMessage?: string;              // 错误信息
-  position: { x: number; y: number }; // 画布位置
+  name: string;
+  position: { x: number; y: number };
+  apiConfig: ApiConfiguration;
 }
-
-type NodeState = 'idle' | 'pending' | 'running' | 'completed' | 'error';
 ```
 
-==== 节点状态流转
+*关键变化*：v1 中的 `state`、`output`、`errorMessage` 字段移至 core-runner 层。
 
-```
-           依赖就绪
-  idle ──────────────► pending ──────────► running
-    ▲                                         │
-    │                      成功               ▼
-    └──── reset ◄──────── completed ◄────────┘
-                              │
-                          失败 ▼
-                            error
-```
+NodeDefinition 只描述"这个节点是什么"，不包含执行状态。
 
-- `idle`: 初始状态，等待依赖或用户触发
-- `pending`: 所有依赖已就绪，排队等待执行
-- `running`: 正在执行 LLM API 调用
-- `completed`: 执行成功，`output` 已填充
-- `error`: 执行失败，`errorMessage` 记录错误
-
-==== 核心操作
-
-- `getNodeDependencies(node)`: 获取节点依赖的上游节点 ID 列表（从 apiConfig 的两个提示词中解析）
-- `isNodeReady(node)`: 检查节点是否可执行（所有依赖已解析）
-- `getNodePrompt(node)`: 获取最终的 `{ system, user }` 提示词对象
-- `getNodeOutput(node)`: 获取输出内容（未完成时返回空字符串）
-
-=== 工作流系统 (Workflow)
-
-工作流管理节点集合，负责依赖解析和执行调度。
-
-==== 工作流结构
+=== 核心操作
 
 ```typescript
-interface Workflow {
+// 创建节点
+function createNodeDef(name: string, position?: Position): NodeDefinition;
+
+// 获取依赖
+function getNodeDependencies(node: NodeDefinition): NodeId[];
+
+// 更新 API 配置
+function updateNodeApiConfig(
+  node: NodeDefinition,
+  updater: (config: ApiConfiguration) => ApiConfiguration
+): NodeDefinition;
+```
+
+== 工作流系统
+
+=== WorkflowDefinition（工作流定义）
+
+```typescript
+interface WorkflowDefinition {
   readonly id: string;
   name: string;
-  nodes: NodeMap;              // 节点集合 (Map<NodeId, Node>)
-  state: WorkflowState;        // 执行状态
-  executionOrder: NodeId[];    // 拓扑排序后的执行顺序
-  currentIndex: number;        // 当前执行位置
-}
-
-type WorkflowState = 'idle' | 'running' | 'completed' | 'error';
-```
-
-==== 拓扑排序 (Kahn's Algorithm)
-
-工作流执行前，需要对节点进行拓扑排序以确定执行顺序：
-
-```typescript
-function topologicalSort(nodes: NodeMap): TopologicalSortResult {
-  // 1. 计算每个节点的入度（依赖数量）
-  // 2. 将入度为 0 的节点加入队列
-  // 3. 依次处理队列中的节点：
-  //    - 将其加入结果列表
-  //    - 将其下游节点的入度减 1
-  //    - 若下游节点入度变为 0，加入队列
-  // 4. 检测循环依赖（未处理完所有节点）
+  nodes: Map<NodeId, NodeDefinition>;
 }
 ```
 
-错误处理：
-- `missing`: 引用了不存在的节点
-- `cycle`: 检测到循环依赖
+*关键变化*：移除了 `state`、`executionOrder`、`currentIndex` 字段，这些属于运行时状态。
 
-==== 执行流程
+=== 核心操作
 
 ```typescript
-// 1. 准备工作流（拓扑排序 + 状态初始化）
-const prepared = prepareWorkflow(workflow);
+// 创建工作流
+function createWorkflowDef(name: string): WorkflowDefinition;
 
-// 2. 定义节点执行器（实际的 LLM API 调用）
-const executor: NodeExecutor = async (nodeId, node) => {
-  const client = new OpenAICompatibleClient({
-    endpoint: node.apiConfig.connection.endpoint,
-    apiKey: node.apiConfig.connection.apiKey
+// 节点操作
+function addNode(workflow: WorkflowDefinition, node: NodeDefinition): WorkflowDefinition;
+function removeNode(workflow: WorkflowDefinition, nodeId: NodeId): WorkflowDefinition;
+function updateNode(
+  workflow: WorkflowDefinition,
+  nodeId: NodeId,
+  updater: (node: NodeDefinition) => NodeDefinition
+): WorkflowDefinition;
+
+// 拓扑排序（纯函数，不修改状态）
+function topologicalSort(workflow: WorkflowDefinition): TopologicalSortResult;
+```
+
+#line(length: 100%)
+
+= Core-Runner 层设计（running-state）
+
+Core-runner 层管理工作流的执行状态，所有数据都是易失的。
+
+== 运行时状态类型
+
+=== VirtualBlockState（虚拟块运行时状态）
+
+```typescript
+interface VirtualBlockState {
+  state: 'pending' | 'resolved' | 'error';
+  resolvedContent: string | null;
+  frozen: boolean;
+}
+
+// 按 blockId 索引
+type VirtualBlockStateMap = Map<TextBlockId, VirtualBlockState>;
+```
+
+=== NodeRuntimeState（节点运行时状态）
+
+```typescript
+interface NodeRuntimeState {
+  state: 'idle' | 'pending' | 'running' | 'completed' | 'error';
+  output: string | null;
+  errorMessage?: string;
+}
+
+// 按 nodeId 索引
+type NodeStateMap = Map<NodeId, NodeRuntimeState>;
+```
+
+=== WorkflowRuntimeState（工作流运行时状态）
+
+```typescript
+interface WorkflowRuntimeState {
+  state: 'idle' | 'running' | 'completed' | 'error';
+  executionOrder: NodeId[];
+  currentIndex: number;
+  nodeStates: NodeStateMap;
+  virtualBlockStates: VirtualBlockStateMap;
+}
+```
+
+== WorkflowRunner 类
+
+```typescript
+class WorkflowRunner {
+  private workflow: WorkflowDefinition;
+  private runtimeState: WorkflowRuntimeState;
+  private apiClient: OpenAICompatibleClient;
+
+  constructor(workflow: WorkflowDefinition) {
+    this.workflow = workflow;
+    this.runtimeState = this.initRuntimeState();
+  }
+
+  // 初始化运行时状态
+  private initRuntimeState(): WorkflowRuntimeState {
+    const nodeStates = new Map<NodeId, NodeRuntimeState>();
+    for (const [id] of this.workflow.nodes) {
+      nodeStates.set(id, { state: 'idle', output: null });
+    }
+    return {
+      state: 'idle',
+      executionOrder: [],
+      currentIndex: 0,
+      nodeStates,
+      virtualBlockStates: new Map()
+    };
+  }
+
+  // 执行工作流
+  async run(): Promise<void> {
+    bus.emit('ui:lock', { reason: 'executing' });
+
+    const sortResult = topologicalSort(this.workflow);
+    if (sortResult.error) {
+      bus.emit('workflow:error', { error: sortResult.error.message });
+      bus.emit('ui:unlock');
+      return;
+    }
+
+    this.runtimeState.executionOrder = sortResult.order;
+    this.runtimeState.state = 'running';
+
+    for (const nodeId of this.runtimeState.executionOrder) {
+      await this.executeNode(nodeId);
+      if (this.runtimeState.state === 'error') break;
+    }
+
+    this.runtimeState.state = this.runtimeState.state === 'error' ? 'error' : 'completed';
+    bus.emit('workflow:done', { workflowId: this.workflow.id });
+    bus.emit('ui:unlock');
+  }
+
+  // 执行单个节点
+  private async executeNode(nodeId: NodeId): Promise<void> {
+    const nodeDef = this.workflow.nodes.get(nodeId)!;
+    const nodeState = this.runtimeState.nodeStates.get(nodeId)!;
+
+    nodeState.state = 'running';
+    bus.emit('node:state', { nodeId, state: 'running' });
+
+    try {
+      const prompt = this.buildPrompt(nodeDef);
+      const response = await this.apiClient.chatCompletion(
+        buildRequestFromConfig(nodeDef.apiConfig, prompt)
+      );
+      const output = extractContent(response);
+
+      nodeState.state = 'completed';
+      nodeState.output = output;
+
+      this.propagateOutput(nodeId, output);
+      bus.emit('node:output', { nodeId, content: output, streaming: false });
+      bus.emit('node:state', { nodeId, state: 'completed' });
+
+    } catch (error) {
+      nodeState.state = 'error';
+      nodeState.errorMessage = error.message;
+      this.runtimeState.state = 'error';
+      bus.emit('node:state', { nodeId, state: 'error' });
+      bus.emit('workflow:error', { error: error.message, nodeId });
+    }
+  }
+
+  // 构建 prompt（解析虚拟块）
+  private buildPrompt(node: NodeDefinition): { system: string; user: string } {
+    return {
+      system: this.resolveTextBlockList(node.apiConfig.systemPrompt),
+      user: this.resolveTextBlockList(node.apiConfig.userPrompt)
+    };
+  }
+
+  // 解析 TextBlockList
+  private resolveTextBlockList(list: TextBlockList): string {
+    return list.blocks.map(block => {
+      if (block.type === 'text') {
+        return block.content;
+      }
+      // virtual block
+      const state = this.runtimeState.virtualBlockStates.get(block.id);
+      if (state?.frozen && state.resolvedContent) {
+        return state.resolvedContent;
+      }
+      if (state?.state === 'resolved' && state.resolvedContent) {
+        return state.resolvedContent;
+      }
+      return `[${block.displayName ?? block.sourceNodeId}]`;
+    }).join('');
+  }
+
+  // 传播输出到下游虚拟块
+  private propagateOutput(nodeId: NodeId, content: string): void {
+    for (const [, nodeDef] of this.workflow.nodes) {
+      this.propagateToList(nodeDef.apiConfig.systemPrompt, nodeId, content);
+      this.propagateToList(nodeDef.apiConfig.userPrompt, nodeId, content);
+    }
+  }
+
+  private propagateToList(list: TextBlockList, nodeId: NodeId, content: string): void {
+    for (const block of list.blocks) {
+      if (block.type === 'virtual' && block.sourceNodeId === nodeId) {
+        const existing = this.runtimeState.virtualBlockStates.get(block.id);
+        if (existing?.frozen) continue;  // 冻结的块不更新
+
+        this.runtimeState.virtualBlockStates.set(block.id, {
+          state: 'resolved',
+          resolvedContent: content,
+          frozen: false
+        });
+      }
+    }
+  }
+
+  // 冻结虚拟块
+  freezeBlock(blockId: TextBlockId): void {
+    const state = this.runtimeState.virtualBlockStates.get(blockId);
+    if (state && state.state === 'resolved') {
+      state.frozen = true;
+    }
+  }
+
+  // 解冻虚拟块
+  unfreezeBlock(blockId: TextBlockId): void {
+    const state = this.runtimeState.virtualBlockStates.get(blockId);
+    if (state) {
+      state.frozen = false;
+    }
+  }
+}
+```
+
+#line(length: 100%)
+
+= EventBus 设计
+
+== 消息类型
+
+```typescript
+interface BusEvents {
+  // UI → core-runner
+  'workflow:run': { workflowId: string };
+  'workflow:stop': void;
+  'node:freeze': { blockId: TextBlockId };
+  'node:unfreeze': { blockId: TextBlockId };
+
+  // core-runner → UI
+  'node:state': {
+    nodeId: NodeId;
+    state: 'idle' | 'pending' | 'running' | 'completed' | 'error';
+  };
+  'node:output': {
+    nodeId: NodeId;
+    content: string;
+    streaming: boolean;
+  };
+  'workflow:done': { workflowId: string };
+  'workflow:error': { error: string; nodeId?: NodeId };
+
+  // UI 锁定
+  'ui:lock': { reason: string };
+  'ui:unlock': void;
+}
+```
+
+== 消息流示例
+
+```
+用户点击"执行"按钮
+    │
+    ▼
+FlowEditor: bus.emit('workflow:run', { workflowId })
+    │
+    ▼
+WorkflowRunner 接收消息，开始执行
+    │
+    ├─► bus.emit('ui:lock', { reason: 'executing' })
+    │       │
+    │       ▼
+    │   FlowEditor: 禁用编辑功能
+    │
+    ├─► bus.emit('node:state', { nodeId: 'A', state: 'running' })
+    │       │
+    │       ▼
+    │   FlowEditor: 更新节点 A 的 UI 状态
+    │
+    ├─► (LLM API 调用)
+    │
+    ├─► bus.emit('node:output', { nodeId: 'A', content: '...', streaming: false })
+    │       │
+    │       ▼
+    │   FlowEditor: 显示节点 A 的输出
+    │
+    ├─► bus.emit('node:state', { nodeId: 'A', state: 'completed' })
+    │
+    ├─► (继续执行节点 B, C, D...)
+    │
+    ├─► bus.emit('workflow:done', { workflowId })
+    │
+    └─► bus.emit('ui:unlock')
+            │
+            ▼
+        FlowEditor: 恢复编辑功能
+```
+
+#line(length: 100%)
+
+= 数据持久化
+
+== 存储内容
+
+只有 metadata 需要持久化，running-state 不存储。
+
+```typescript
+interface WorkflowRecord {
+  id: string;
+  name: string;
+  data: string;  // JSON.stringify(WorkflowDefinition)
+  createdAt: number;
+  updatedAt: number;
+}
+```
+
+== 序列化
+
+```typescript
+function serializeWorkflow(workflow: WorkflowDefinition): string {
+  return JSON.stringify({
+    ...workflow,
+    nodes: Array.from(workflow.nodes.entries())
   });
-  const request = buildRequestFromConfig(node.apiConfig);
-  const response = await client.chatCompletion(request);
-  return response.choices[0]?.message.content ?? '';
-};
+}
 
-// 3. 执行工作流
-const result = await executeWorkflow(prepared, executor, (progress) => {
-  console.log(`执行进度: ${progress.currentIndex}/${progress.executionOrder.length}`);
-});
-```
-
-==== 状态传播
-
-当一个节点执行完成时，其输出会自动传播到所有依赖它的下游节点：
-
-```typescript
-function propagateNodeOutput(nodes, completedNodeId, outputContent) {
-  // 遍历所有节点
-  // 若节点的 apiConfig.systemPrompt 或 apiConfig.userPrompt 中
-  // 有虚拟块引用 completedNodeId
-  // 则调用 resolveApiConfigOutput 更新这些虚拟块
+function deserializeWorkflow(data: string): WorkflowDefinition {
+  const parsed = JSON.parse(data);
+  return {
+    ...parsed,
+    nodes: new Map(parsed.nodes)
+  };
 }
 ```
 
-=== 完整示例
+== 冻结块的持久化处理
+
+当用户保存工作流时，如果存在已冻结的虚拟块：
+
+1. 提示用户："检测到冻结的虚拟块，是否转换为普通文本块？"
+2. 如果用户同意，将 `VirtualTextBlockDef` 转换为 `TextBlock`，内容为 `resolvedContent`
+3. 如果用户拒绝，保存原始的 `VirtualTextBlockDef`（下次加载时内容将丢失）
+
+```typescript
+function convertFrozenBlocksToText(
+  workflow: WorkflowDefinition,
+  frozenStates: Map<TextBlockId, VirtualBlockState>
+): WorkflowDefinition {
+  // 遍历所有节点的所有 TextBlockList
+  // 将已冻结的 VirtualTextBlockDef 转换为 TextBlock
+}
+```
+
+#line(length: 100%)
+
+= 完整示例
+
+== 定义工作流
 
 ```typescript
 import {
-  createWorkflow,
-  createNode,
+  createWorkflowDef,
+  createNodeDef,
   addNode,
   createTextBlockList,
   createTextBlock,
-  createVirtualTextBlock,
-  createApiConfiguration,
-  updateSystemPrompt,
-  updateUserPrompt,
-  executeWorkflow
-} from './lib/core';
+  createVirtualBlockDef
+} from '$lib/core';
 
 // 创建工作流
-let workflow = createWorkflow('文章润色工作流');
+let workflow = createWorkflowDef('文章润色工作流');
 
-// 创建节点 A: 生成大纲
-const nodeA = createNode('生成大纲', { x: 100, y: 100 });
+// 节点 A: 生成大纲
+const nodeA = createNodeDef('生成大纲', { x: 100, y: 100 });
 nodeA.apiConfig = {
   ...nodeA.apiConfig,
   systemPrompt: createTextBlockList([
@@ -388,329 +594,172 @@ nodeA.apiConfig = {
   ])
 };
 
-// 创建节点 B: 扩写第一部分
-const nodeB = createNode('扩写第一部分', { x: 100, y: 250 });
+// 节点 B: 扩写第一部分（依赖 A）
+const nodeB = createNodeDef('扩写第一部分', { x: 100, y: 250 });
 nodeB.apiConfig = {
   ...nodeB.apiConfig,
-  systemPrompt: createTextBlockList([
-    createTextBlock('你是一个专业的技术文章写作助手。')
-  ]),
   userPrompt: createTextBlockList([
     createTextBlock('基于以下大纲，扩写第一部分：\n\n'),
-    createVirtualTextBlock(nodeA.id, '大纲')
+    createVirtualBlockDef(nodeA.id, '大纲')
   ])
 };
 
-// 创建节点 C: 扩写第二部分
-const nodeC = createNode('扩写第二部分', { x: 300, y: 250 });
+// 节点 C: 扩写第二部分（依赖 A）
+const nodeC = createNodeDef('扩写第二部分', { x: 300, y: 250 });
 nodeC.apiConfig = {
   ...nodeC.apiConfig,
-  systemPrompt: createTextBlockList([
-    createTextBlock('你是一个专业的技术文章写作助手。')
-  ]),
   userPrompt: createTextBlockList([
     createTextBlock('基于以下大纲，扩写第二部分：\n\n'),
-    createVirtualTextBlock(nodeA.id, '大纲')
+    createVirtualBlockDef(nodeA.id, '大纲')
   ])
 };
 
-// 创建节点 D: 合并润色
-const nodeD = createNode('合并润色', { x: 200, y: 400 });
+// 节点 D: 合并润色（依赖 B 和 C）
+const nodeD = createNodeDef('合并润色', { x: 200, y: 400 });
 nodeD.apiConfig = {
   ...nodeD.apiConfig,
-  systemPrompt: createTextBlockList([
-    createTextBlock('你是一个专业的文章编辑，擅长润色和整合文章内容。')
-  ]),
   userPrompt: createTextBlockList([
     createTextBlock('请将以下两部分内容合并并润色：\n\n第一部分：\n'),
-    createVirtualTextBlock(nodeB.id, '第一部分'),
+    createVirtualBlockDef(nodeB.id, '第一部分'),
     createTextBlock('\n\n第二部分：\n'),
-    createVirtualTextBlock(nodeC.id, '第二部分')
+    createVirtualBlockDef(nodeC.id, '第二部分')
   ])
 };
 
-// 添加节点到工作流
+// 添加节点
 workflow = addNode(workflow, nodeA);
 workflow = addNode(workflow, nodeB);
 workflow = addNode(workflow, nodeC);
 workflow = addNode(workflow, nodeD);
 
-// 执行工作流
-// 执行顺序将是: A → B, C (并行) → D
-const result = await executeWorkflow(workflow, executor);
+// 保存到数据库
+await saveWorkflow(workflow);
 ```
 
-依赖图：
+== 执行工作流
+
+```typescript
+import { bus } from '$lib/bus';
+import { WorkflowRunner } from '$lib/core-runner';
+
+// UI 层监听事件
+const unsubscribes = [
+  bus.on('ui:lock', () => { isLocked = true; }),
+  bus.on('ui:unlock', () => { isLocked = false; }),
+  bus.on('node:state', ({ nodeId, state }) => {
+    updateNodeUI(nodeId, state);
+  }),
+  bus.on('node:output', ({ nodeId, content }) => {
+    displayNodeOutput(nodeId, content);
+  }),
+  bus.on('workflow:done', () => {
+    showNotification('工作流执行完成');
+  }),
+  bus.on('workflow:error', ({ error }) => {
+    showError(error);
+  })
+];
+
+// 加载工作流
+const workflow = await loadWorkflow(workflowId);
+
+// 创建 Runner 并执行
+const runner = new WorkflowRunner(workflow);
+
+// 触发执行（通过 EventBus）
+bus.emit('workflow:run', { workflowId: workflow.id });
+```
+
+== 依赖图
 
 ```
     ┌──────────┐
     │  Node A  │  (生成大纲)
-    │  大纲生成  │
     └────┬─────┘
          │
     ┌────┴────┐
     ▼         ▼
 ┌──────┐  ┌──────┐
 │Node B│  │Node C│  (扩写各部分)
-│ 第一部分│  │ 第二部分│
 └───┬──┘  └──┬───┘
     │        │
     └───┬────┘
         ▼
    ┌─────────┐
    │  Node D │  (合并润色)
-   │  最终输出 │
    └─────────┘
 ```
 
-= 数据持久化
+拓扑排序结果：`[A, B, C, D]` 或 `[A, C, B, D]`
 
-FlowWrite 使用 IndexedDB 实现本地数据持久化，通过 Dexie.js 库提供简洁的 API。采用文档导向的存储模式，将复杂对象以 JSON 形式存储。
+执行时 B 和 C 可并行（未来优化方向）。
 
-== 存储架构
+#line(length: 100%)
 
-=== 数据库结构
+= 与 v1 的对比
+
+#table(
+  columns: (auto, auto, auto),
+  inset: 8pt,
+  align: horizon,
+  [*方面*], [*v1*], [*v2*],
+  [Node 类型], [包含 state/output], [只有 metadata],
+  [VirtualTextBlock], [包含 state/resolvedContent/frozen], [只有 sourceNodeId],
+  [Workflow], [包含 executionOrder/currentIndex], [只有 nodes],
+  [通信机制], [无], [EventBus],
+  [运行时状态], [混在 core/], [独立的 core-runner/],
+  [持久化], [需要过滤字段], [直接序列化],
+  [UI 锁定], [无], [有],
+)
+
+== 迁移影响
+
+1. `core/node.ts` → 重命名为 `NodeDefinition`，移除 state/output
+2. `core/textblock.ts` → `VirtualTextBlock` 重命名为 `VirtualTextBlockDef`，移除运行时字段
+3. `core/workflow.ts` → 重命名为 `WorkflowDefinition`，移除运行时字段，`executeWorkflow` 移至 `core-runner/`
+4. 新增 `core-runner/` 目录
+5. 新增 `bus/` 目录
+
+#line(length: 100%)
+
+= 未来扩展
+
+== 流式输出
 
 ```typescript
-// 两张表，简洁高效
-class FlowWriteDB extends Dexie {
-  workflows!: Table<WorkflowRecord>;  // 工作流存储
-  settings!: Table<SettingsRecord>;   // 设置存储
-
-  constructor() {
-    super('FlowWriteDB');
-    this.version(1).stores({
-      workflows: 'id, name, updatedAt',
-      settings: 'key'
-    });
-  }
+'node:output': {
+  nodeId: NodeId;
+  content: string;
+  streaming: boolean;  // true = 增量更新
+  done: boolean;       // true = 流式结束
 }
 ```
 
-=== 工作流存储 (WorkflowRecord)
+UI 层根据 `streaming` 和 `done` 决定如何显示。
+
+== 节点级重试
 
 ```typescript
-interface WorkflowRecord {
-  id: string;        // 主键
-  name: string;      // 工作流名称
-  data: string;      // JSON.stringify(Workflow) - 完整工作流数据
-  createdAt: number; // 创建时间戳
-  updatedAt: number; // 更新时间戳
+'node:retry': { nodeId: NodeId }
+```
+
+WorkflowRunner 重新执行指定节点。
+
+== 并行执行
+
+将拓扑排序结果按"层"分组，同一层的节点使用 `Promise.all` 并行执行。
+
+== 条件节点
+
+```typescript
+interface ConditionNodeDefinition {
+  type: 'condition';
+  id: NodeId;
+  name: string;
+  condition: string;  // 表达式
+  trueBranch: NodeId;
+  falseBranch: NodeId;
 }
 ```
 
-采用文档导向存储的原因：
-- TextBlockList 包含嵌套对象（TextBlock、VirtualTextBlock）
-- ApiConfiguration 结构深度嵌套
-- 工作流很少按内部字段查询
-- 序列化/反序列化更简单
-
-=== 设置存储 (SettingsRecord)
-
-```typescript
-interface SettingsRecord {
-  key: string;       // 主键（如 'apiTest:endpoint'）
-  value: string;     // JSON.stringify(value)
-  updatedAt: number; // 更新时间戳
-}
-```
-
-预定义的设置键：
-- `apiTest:endpoint` - API 端点 URL
-- `apiTest:apiKey` - API 密钥
-- `apiTest:model` - 模型标识符
-- `apiTest:temperature` - 采样温度
-- `apiTest:maxTokens` - 最大 token 数
-- `apiTest:systemPrompt` - 系统提示词
-- `apiTest:messages` - 对话历史
-- `preferences:activePage` - 当前页面
-
-== 数据访问层
-
-=== 工作流操作
-
-```typescript
-// 保存工作流
-async function saveWorkflow(workflow: Workflow): Promise<void>
-
-// 加载工作流
-async function loadWorkflow(id: string): Promise<Workflow | null>
-
-// 列出所有工作流（仅摘要）
-async function listWorkflows(): Promise<WorkflowSummary[]>
-
-// 删除工作流
-async function deleteWorkflow(id: string): Promise<void>
-```
-
-=== 设置操作
-
-```typescript
-// 保存设置
-async function saveSetting<T>(key: string, value: T): Promise<void>
-
-// 加载设置（带默认值）
-async function loadSetting<T>(key: string, defaultValue: T): Promise<T>
-
-// 批量保存
-async function saveSettings(settings: Record<string, unknown>): Promise<void>
-
-// 批量加载
-async function loadSettings<T>(defaults: T): Promise<T>
-```
-
-== 响应式持久化
-
-利用 Svelte 5 的 `$effect` 实现自动保存：
-
-```typescript
-let isLoaded = $state(false);
-
-// 组件挂载时加载数据
-onMount(async () => {
-  endpoint = await loadSetting('apiTest:endpoint', 'https://api.openai.com/v1');
-  apiKey = await loadSetting('apiTest:apiKey', '');
-  // ...
-  isLoaded = true;
-});
-
-// 数据变化时自动保存
-$effect(() => {
-  if (!isLoaded) return;  // 防止保存默认值
-  saveSetting('apiTest:endpoint', endpoint);
-});
-```
-
-关键设计：
-- `isLoaded` 标志防止在加载完成前保存默认值
-- 每个状态变量独立的 `$effect` 实现细粒度保存
-- 异步操作不阻塞 UI
-
-== 序列化处理
-
-由于 `Workflow.nodes` 是 `Map` 类型，需要特殊处理：
-
-```typescript
-// 序列化：Map → Array
-function serializeWorkflow(workflow: Workflow): string {
-  const serializable = {
-    ...workflow,
-    nodes: Array.from(workflow.nodes.entries())
-  };
-  return JSON.stringify(serializable);
-}
-
-// 反序列化：Array → Map
-function deserializeWorkflow(data: string): Workflow {
-  const parsed = JSON.parse(data);
-  return {
-    ...parsed,
-    nodes: new Map(parsed.nodes)
-  };
-}
-```
-
-=== 嵌套结构序列化
-
-TextBlockList、Node、ApiConfiguration 等嵌套结构直接序列化为 JSON，无需特殊处理：
-
-==== TextBlockList 序列化
-
-```typescript
-// TextBlockList 及其包含的块直接序列化
-const textBlockList: TextBlockList = {
-  id: 'list-123',
-  blocks: [
-    { type: 'text', id: 'tb-1', content: '请分析以下内容：' },
-    {
-      type: 'virtual',
-      id: 'vtb-1',
-      sourceNodeId: 'node-abc',
-      state: 'pending',
-      resolvedContent: null,
-      frozen: false,
-      displayName: '上游输出'
-    }
-  ]
-};
-
-// JSON.stringify 直接处理，无需转换
-JSON.stringify(textBlockList);
-// => {"id":"list-123","blocks":[{"type":"text","id":"tb-1","content":"请分析以下内容："},{"type":"virtual","id":"vtb-1","sourceNodeId":"node-abc","state":"pending","resolvedContent":null,"frozen":false,"displayName":"上游输出"}]}
-```
-
-==== Node 序列化
-
-```typescript
-// 节点包含 ApiConfiguration，其中包含两个 TextBlockList
-const node: Node = {
-  id: 'node-123',
-  name: '内容总结',
-  apiConfig: {
-    connection: {
-      endpoint: 'https://api.openai.com/v1',
-      apiKey: 'sk-...',
-      model: 'gpt-4o'
-    },
-    parameters: {
-      temperature: 0.7,
-      maxTokens: 4096,
-      topP: 1,
-      presencePenalty: 0,
-      frequencyPenalty: 0,
-      stopSequences: [],
-      streaming: true
-    },
-    systemPrompt: {
-      id: 'sys-prompt',
-      blocks: [{ type: 'text', id: 'sp-1', content: '你是一个专业的内容总结助手。' }]
-    },
-    userPrompt: {
-      id: 'user-prompt',
-      blocks: [
-        { type: 'text', id: 'up-1', content: '请总结以下内容：\n' },
-        { type: 'virtual', id: 'up-2', sourceNodeId: 'node-source', state: 'pending', resolvedContent: null, frozen: false }
-      ]
-    }
-  },
-  output: null,
-  state: 'idle',
-  position: { x: 200, y: 150 }
-};
-
-// 直接序列化，所有嵌套结构自动处理
-JSON.stringify(node);
-```
-
-==== 完整工作流存储结构
-
-```json
-{
-  "id": "workflow-abc",
-  "name": "文章润色工作流",
-  "nodes": [
-    ["node-1", { /* Node 对象 */ }],
-    ["node-2", { /* Node 对象 */ }]
-  ],
-  "state": "idle",
-  "executionOrder": [],
-  "currentIndex": 0
-}
-```
-
-关键点：
-- `nodes` 字段是 `[nodeId, node]` 元组数组（由 `Map.entries()` 生成）
-- 每个 Node 包含完整的 `apiConfig`，其中 `systemPrompt` 和 `userPrompt` 都是 TextBlockList
-- VirtualTextBlock 的 `resolvedContent` 在未解析时为 `null`，解析后存储实际内容
-
-== 安全考虑
-
-API 密钥存储在 IndexedDB 中，具有以下特性：
-- 同源隔离：其他网站无法访问
-- 本地存储：数据不会发送到服务器
-- 未加密：目前以明文存储（未来可添加加密层）
-
-未来增强方向：
-- 使用用户密码派生密钥进行加密
-- 支持密钥导入/导出
-- 会话级别的临时存储选项
+当前不实现，预留扩展点。
