@@ -1,3 +1,10 @@
+# dev board
+
+- [ ] agent support
+- [ ] advanced features
+- [ ] impl(coming soon)
+- [x] base design
+
 # FlowWrite
 
 A browser-based visual workflow editor designed for writers working with AI.
