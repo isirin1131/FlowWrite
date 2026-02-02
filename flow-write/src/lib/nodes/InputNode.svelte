@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+  import { Handle, Position } from '@xyflow/svelte';
 
-  type $$Props = NodeProps;
+  interface NodeData {
+    label?: string;
+    inputType?: string;
+  }
 
-  export let data: $$Props['data'];
-  export let selected: $$Props['selected'] = false;
+  let { data, selected = false }: { data: NodeData; selected?: boolean } = $props();
 
-  $: label = data.label || 'Input';
+  const label = $derived(data.label || 'Input');
 </script>
 
 <div class="custom-node input-node" class:selected>
@@ -21,7 +23,7 @@
     <span class="input-type">{data.inputType || 'text'}</span>
   </div>
 
-  <Handle type="source" position={Position.Right} class="!bg-warning-500" />
+  <Handle type="source" position={Position.Right} />
 </div>
 
 <style>

@@ -1,14 +1,18 @@
 <script lang="ts">
-  import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+  import { Handle, Position } from '@xyflow/svelte';
 
-  type $$Props = NodeProps;
+  interface NodeData {
+    label?: string;
+    status?: string;
+    provider?: string;
+    model?: string;
+  }
 
-  export let data: $$Props['data'];
-  export let selected: $$Props['selected'] = false;
+  let { data, selected = false }: { data: NodeData; selected?: boolean } = $props();
 
-  $: status = data.status || 'idle';
-  $: label = data.label || 'LLM Node';
-  $: provider = data.provider || 'OpenAI';
+  const status = $derived(data.status || 'idle');
+  const label = $derived(data.label || 'LLM Node');
+  const provider = $derived(data.provider || 'OpenAI');
 </script>
 
 <div class="custom-node" class:selected>
@@ -33,8 +37,8 @@
     {/if}
   </div>
 
-  <Handle type="target" position={Position.Left} class="!bg-primary-500" />
-  <Handle type="source" position={Position.Right} class="!bg-primary-500" />
+  <Handle type="target" position={Position.Left} />
+  <Handle type="source" position={Position.Right} />
 </div>
 
 <style>

@@ -1,17 +1,32 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
+  interface MenuItem {
+    label: string;
+    icon: string;
+    action: string;
+    danger?: boolean;
+  }
 
-  const dispatch = createEventDispatcher();
+  interface Divider {
+    type: 'divider';
+  }
 
-  let { x = 0, y = 0, visible = false, type = 'node', id = '' }: {
+  let {
+    x = 0,
+    y = 0,
+    visible = $bindable(false),
+    type = 'node',
+    id = '',
+    onaction
+  }: {
     x: number;
     y: number;
     visible: boolean;
     type: 'node' | 'edge';
     id: string;
+    onaction?: (detail: { action: string; type: 'node' | 'edge'; id: string }) => void;
   } = $props();
 
-  const menuItems = [
+  const menuItems: (MenuItem | Divider)[] = [
     { label: 'Copy', icon: '📋', action: 'copy' },
     { label: 'Duplicate', icon: '📄', action: 'duplicate' },
     { type: 'divider' },
@@ -19,11 +34,11 @@
   ];
 
   function handleAction(action: string) {
-    dispatch('action', { action, type, id });
+    onaction?.({ action, type, id });
     visible = false;
   }
 
-  function handleClickOutside(event: MouseEvent) {
+  function handleClickOutside() {
     if (visible) {
       visible = false;
     }
@@ -40,9 +55,9 @@
 {#if visible}
   <div class="context-menu" style="left: {x}px; top: {y}px;">
     {#each menuItems as item}
-      {#if item.type === 'divider'}
+      {#if 'type' in item && item.type === 'divider'}
         <div class="context-menu-divider"></div>
-      {:else}
+      {:else if 'action' in item}
         <button
           class="context-menu-item"
           class:danger={item.danger}

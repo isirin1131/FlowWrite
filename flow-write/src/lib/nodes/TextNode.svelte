@@ -1,13 +1,16 @@
 <script lang="ts">
-  import { Handle, Position, type NodeProps } from '@xyflow/svelte';
+  import { Handle, Position } from '@xyflow/svelte';
 
-  type $$Props = NodeProps;
+  interface NodeData {
+    label?: string;
+    text?: string;
+  }
 
-  export let data: $$Props['data'];
-  export let selected: $$Props['selected'] = false;
+  let { data, selected = false }: { data: NodeData; selected?: boolean } = $props();
 
-  $: label = data.label || 'Text Node';
-  $: text = (data.text as string) || '';
+  const label = $derived(data.label || 'Text Node');
+  const text = $derived(data.text || '');
+  const preview = $derived(text.length > 50 ? text.substring(0, 50) + '...' : text || 'Empty text');
 </script>
 
 <div class="custom-node" class:selected>
@@ -19,13 +22,11 @@
   </div>
 
   <div class="node-content">
-    <p class="text-preview">
-      {text.length > 50 ? text.substring(0, 50) + '...' : text || 'Empty text'}
-    </p>
+    <p class="text-preview">{preview}</p>
   </div>
 
-  <Handle type="target" position={Position.Left} class="!bg-success-500" />
-  <Handle type="source" position={Position.Right} class="!bg-success-500" />
+  <Handle type="target" position={Position.Left} />
+  <Handle type="source" position={Position.Right} />
 </div>
 
 <style>

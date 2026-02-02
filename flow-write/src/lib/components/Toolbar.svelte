@@ -1,25 +1,19 @@
 <script lang="ts">
-  import { createEventDispatcher } from 'svelte';
-
-  const dispatch = createEventDispatcher();
-
   let {
     darkMode = false,
-    layoutDirection = 'TB'
+    layoutDirection = 'TB',
+    onaction
   }: {
     darkMode: boolean;
     layoutDirection: 'TB' | 'LR';
+    onaction?: (action: string) => void;
   } = $props();
-
-  function handleAction(action: string) {
-    dispatch('action', action);
-  }
 </script>
 
 <div class="toolbar">
   <button
     class="toolbar-button"
-    onclick={() => handleAction('layout')}
+    onclick={() => onaction?.('layout')}
     title="Auto Layout"
   >
     <span>📐</span>
@@ -28,7 +22,7 @@
 
   <button
     class="toolbar-button"
-    onclick={() => handleAction('layout-tb')}
+    onclick={() => onaction?.('layout-tb')}
     class:active={layoutDirection === 'TB'}
     title="Top to Bottom"
   >
@@ -37,7 +31,7 @@
 
   <button
     class="toolbar-button"
-    onclick={() => handleAction('layout-lr')}
+    onclick={() => onaction?.('layout-lr')}
     class:active={layoutDirection === 'LR'}
     title="Left to Right"
   >
@@ -48,7 +42,7 @@
 
   <button
     class="toolbar-button"
-    onclick={() => handleAction('execute')}
+    onclick={() => onaction?.('execute')}
     title="Execute Workflow"
   >
     <span>▶️</span>
@@ -57,7 +51,7 @@
 
   <button
     class="toolbar-button"
-    onclick={() => handleAction('validate')}
+    onclick={() => onaction?.('validate')}
     title="Validate Workflow"
   >
     <span>✅</span>
@@ -68,7 +62,7 @@
 
   <button
     class="toolbar-button"
-    onclick={() => handleAction('dark-mode')}
+    onclick={() => onaction?.('dark-mode')}
     class:active={darkMode}
     title="Toggle Dark Mode"
   >

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { OpenAICompatibleClient, buildChatRequest } from './api/client';
+  import { OpenAICompatibleClient } from './api/client';
   import type {
     ChatMessage,
     ChatCompletionRequest,

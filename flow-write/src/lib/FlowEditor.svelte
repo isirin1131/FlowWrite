@@ -68,8 +68,8 @@
     };
   }
 
-  function handleContextMenuAction(event: CustomEvent<{ action: string; type: 'node' | 'edge'; id: string }>) {
-    const { action, type, id } = event.detail;
+  function handleContextMenuAction(detail: { action: string; type: 'node' | 'edge'; id: string }) {
+    const { action, type, id } = detail;
 
     switch (action) {
       case 'delete':
@@ -199,7 +199,7 @@
     <Toolbar
       {darkMode}
       {layoutDirection}
-      onaction={(e: CustomEvent<string>) => handleToolbarAction(e.detail)}
+      onaction={handleToolbarAction}
     />
 
     <div class="flow-canvas" ondrop={handleDrop} ondragover={(e: DragEvent) => e.preventDefault()} role="application">
@@ -217,7 +217,7 @@
   <ContextMenu
     x={contextMenu.x}
     y={contextMenu.y}
-    visible={contextMenu.visible}
+    bind:visible={contextMenu.visible}
     type={contextMenu.type}
     id={contextMenu.id}
     onaction={handleContextMenuAction}
