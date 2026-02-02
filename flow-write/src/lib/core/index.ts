@@ -1,69 +1,42 @@
 /**
- * FlowWrite Core Module
+ * FlowWrite Core Module (metadata only)
  *
- * Export all core types and functions for the workflow system.
+ * Exports type definitions and pure functions for workflow metadata.
+ * Runtime state and execution logic belong in core-runner.
  */
 
 // Text Block System
 export {
-  // Types
   type TextBlockId,
   type NodeId,
   type TextBlock,
-  type VirtualTextBlock,
-  type VirtualTextBlockState,
-  type AnyTextBlock,
+  type VirtualTextBlockDef,
+  type AnyTextBlockDef,
   type TextBlockList,
 
-  // TextBlock functions
   generateId,
   createTextBlock,
-
-  // VirtualTextBlock functions
-  createVirtualTextBlock,
-  resolveVirtualTextBlock,
-  errorVirtualTextBlock,
-  freezeVirtualTextBlock,
-  unfreezeVirtualTextBlock,
-  resetVirtualTextBlock,
-
-  // AnyTextBlock functions
-  getBlockContent,
-  isBlockReady,
-
-  // TextBlockList functions
+  createVirtualTextBlockDef,
   createTextBlockList,
   appendBlock,
   insertBlock,
   removeBlock,
   updateBlock,
   findBlock,
-  getListContent,
-  isListReady,
-  getPendingVirtualBlocks,
-  getDependencies,
-  resolveNodeOutput,
-  resetNodeDependents
+  getDependencies
 } from './textblock';
 
 // API Configuration System
 export {
-  // Types
   type ApiConnection,
   type ApiParameters,
   type ApiConfiguration,
 
-  // Constants
   defaultApiConnection,
   defaultApiParameters,
 
-  // Functions
   createApiConfiguration,
   getApiConfigDependencies,
-  isApiConfigReady,
-  getSystemPromptContent,
-  getUserPromptContent,
-  resolveApiConfigOutput,
   updateApiConnection,
   updateApiParameters,
   updateSystemPrompt,
@@ -72,48 +45,28 @@ export {
 
 // Node System
 export {
-  // Types
-  type NodeState,
-  type Node,
+  type NodeDefinition,
   type NodeMap,
 
-  // Node functions
-  createNode,
+  createNodeDefinition,
   getNodeDependencies,
-  isNodeReady,
-  getNodePrompt,
   updateNodeApiConfig,
-  setNodePending,
-  setNodeRunning,
-  setNodeCompleted,
-  setNodeError,
-  resetNode,
-  getNodeOutput,
-
-  // Node collection functions
-  createNodeMap,
-  propagateNodeOutput
+  updateNodePosition,
+  updateNodeName,
+  createNodeMap
 } from './node';
 
 // Workflow System
 export {
-  // Types
-  type WorkflowState,
-  type Workflow,
+  type WorkflowDefinition,
   type DependencyError,
   type TopologicalSortResult,
-  type NodeExecutor,
 
-  // Workflow functions
-  createWorkflow,
+  createWorkflowDefinition,
   topologicalSort,
-  prepareWorkflow,
-  executeNode,
-  executeWorkflow,
   addNode,
   removeNode,
   updateNode,
   getNode,
-  getNodes,
-  resetWorkflow
+  getNodes
 } from './workflow';

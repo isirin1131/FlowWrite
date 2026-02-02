@@ -1,35 +1,25 @@
 /**
- * API Configuration System for FlowWrite
+ * API Configuration System for FlowWrite (metadata only)
  *
- * ApiConfiguration is the core component that encapsulates all settings
- * for an LLM API call, including connection, parameters, and prompts.
+ * ApiConfiguration defines the settings for an LLM API call.
  * Prompts are TextBlockLists, allowing virtual blocks that reference
- * other nodes' outputs.
+ * other nodes' outputs. Runtime resolution belongs in core-runner.
  */
 
 import {
   type TextBlockList,
   type NodeId,
   createTextBlockList,
-  getDependencies,
-  isListReady,
-  getListContent,
-  resolveNodeOutput
+  getDependencies
 } from './textblock';
 
 // ============================================================================
 // Connection Settings
 // ============================================================================
 
-/**
- * Connection settings for OpenAI-compatible endpoints
- */
 export interface ApiConnection {
-  /** API endpoint URL (e.g., "https://api.openai.com/v1") */
   endpoint: string;
-  /** API key for authentication */
   apiKey: string;
-  /** Model identifier (e.g., "gpt-4o", "deepseek-chat") */
   model: string;
 }
 
@@ -43,23 +33,13 @@ export const defaultApiConnection: ApiConnection = {
 // Request Parameters
 // ============================================================================
 
-/**
- * Request parameters for LLM generation
- */
 export interface ApiParameters {
-  /** Temperature for sampling (0-2) */
   temperature: number;
-  /** Maximum tokens to generate */
   maxTokens: number;
-  /** Nucleus sampling parameter (0-1) */
   topP: number;
-  /** Presence penalty (-2 to 2) */
   presencePenalty: number;
-  /** Frequency penalty (-2 to 2) */
   frequencyPenalty: number;
-  /** Stop sequences that halt generation */
   stopSequences: string[];
-  /** Enable streaming response */
   streaming: boolean;
 }
 
@@ -77,24 +57,13 @@ export const defaultApiParameters: ApiParameters = {
 // API Configuration
 // ============================================================================
 
-/**
- * Complete API configuration for a node
- * Combines connection, parameters, and prompts
- */
 export interface ApiConfiguration {
-  /** Connection settings (endpoint, apiKey, model) */
   connection: ApiConnection;
-  /** Generation parameters */
   parameters: ApiParameters;
-  /** System prompt as a TextBlockList (supports virtual blocks) */
   systemPrompt: TextBlockList;
-  /** User prompt as a TextBlockList (supports virtual blocks) */
   userPrompt: TextBlockList;
 }
 
-/**
- * Create a new API configuration with default values
- */
 export function createApiConfiguration(): ApiConfiguration {
   return {
     connection: { ...defaultApiConnection },
@@ -105,7 +74,7 @@ export function createApiConfiguration(): ApiConfiguration {
 }
 
 // ============================================================================
-// Helper Functions
+// Metadata Helpers
 // ============================================================================
 
 /**
@@ -115,42 +84,6 @@ export function getApiConfigDependencies(config: ApiConfiguration): NodeId[] {
   const systemDeps = getDependencies(config.systemPrompt);
   const userDeps = getDependencies(config.userPrompt);
   return [...new Set([...systemDeps, ...userDeps])];
-}
-
-/**
- * Check if ApiConfiguration is ready (all virtual blocks resolved)
- */
-export function isApiConfigReady(config: ApiConfiguration): boolean {
-  return isListReady(config.systemPrompt) && isListReady(config.userPrompt);
-}
-
-/**
- * Get the final system prompt string
- */
-export function getSystemPromptContent(config: ApiConfiguration): string {
-  return getListContent(config.systemPrompt);
-}
-
-/**
- * Get the final user prompt string
- */
-export function getUserPromptContent(config: ApiConfiguration): string {
-  return getListContent(config.userPrompt);
-}
-
-/**
- * Resolve a node output in both prompts
- */
-export function resolveApiConfigOutput(
-  config: ApiConfiguration,
-  nodeId: NodeId,
-  content: string
-): ApiConfiguration {
-  return {
-    ...config,
-    systemPrompt: resolveNodeOutput(config.systemPrompt, nodeId, content),
-    userPrompt: resolveNodeOutput(config.userPrompt, nodeId, content)
-  };
 }
 
 /**

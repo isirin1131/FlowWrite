@@ -1,8 +1,8 @@
 /**
  * OpenAI-Compatible LLM Client
  *
- * A single client implementation that works with any OpenAI-compatible API endpoint.
- * This includes OpenAI, DeepSeek, local LLM servers, and other compatible services.
+ * A client that works with any OpenAI-compatible API endpoint.
+ * Supports OpenAI, DeepSeek, local LLM servers, and other compatible services.
  */
 
 import type {
@@ -12,22 +12,13 @@ import type {
   ChatMessage,
   UsageInfo
 } from './types';
-import type {
-  ApiConfiguration
-} from '../core/apiconfig';
-import {
-  getSystemPromptContent,
-  getUserPromptContent
-} from '../core/apiconfig';
 
 // ============================================================================
 // Client Configuration
 // ============================================================================
 
 export interface ClientConfig {
-  /** API endpoint URL (e.g., "https://api.openai.com/v1") */
   endpoint: string;
-  /** API key for authentication */
   apiKey: string;
 }
 
@@ -40,7 +31,7 @@ export class OpenAICompatibleClient {
   private apiKey: string;
 
   constructor(config: ClientConfig) {
-    this.endpoint = config.endpoint.replace(/\/$/, ''); // Remove trailing slash
+    this.endpoint = config.endpoint.replace(/\/$/, '');
     this.apiKey = config.apiKey;
   }
 
@@ -51,9 +42,6 @@ export class OpenAICompatibleClient {
     };
   }
 
-  /**
-   * Create a non-streaming chat completion
-   */
   async chatCompletion(request: ChatCompletionRequest): Promise<ChatCompletionResponse> {
     const response = await fetch(`${this.endpoint}/chat/completions`, {
       method: 'POST',
@@ -69,9 +57,6 @@ export class OpenAICompatibleClient {
     return response.json();
   }
 
-  /**
-   * Create a streaming chat completion
-   */
   async *chatCompletionStream(request: ChatCompletionRequest): AsyncGenerator<StreamChunk, void, unknown> {
     const response = await fetch(`${this.endpoint}/chat/completions`, {
       method: 'POST',
@@ -112,58 +97,6 @@ export class OpenAICompatibleClient {
       }
     }
   }
-}
-
-// ============================================================================
-// Request Builder
-// ============================================================================
-
-/**
- * Build a ChatCompletionRequest from ApiConfiguration
- */
-export function buildRequestFromConfig(config: ApiConfiguration): ChatCompletionRequest {
-  const messages: ChatMessage[] = [];
-
-  const systemContent = getSystemPromptContent(config);
-  if (systemContent.trim()) {
-    messages.push({ role: 'system', content: systemContent });
-  }
-
-  const userContent = getUserPromptContent(config);
-  if (userContent.trim()) {
-    messages.push({ role: 'user', content: userContent });
-  }
-
-  return {
-    model: config.connection.model,
-    messages,
-    max_tokens: config.parameters.maxTokens,
-    temperature: config.parameters.temperature,
-    top_p: config.parameters.topP,
-    presence_penalty: config.parameters.presencePenalty,
-    frequency_penalty: config.parameters.frequencyPenalty,
-    stop: config.parameters.stopSequences.length > 0
-      ? config.parameters.stopSequences
-      : undefined,
-    stream: config.parameters.streaming
-  };
-}
-
-/**
- * Build a ChatCompletionRequest from messages and options
- */
-export function buildChatRequest(
-  messages: ChatMessage[],
-  model: string,
-  options: Partial<ChatCompletionRequest> = {}
-): ChatCompletionRequest {
-  return {
-    model,
-    messages,
-    max_tokens: 4096,
-    temperature: 0.7,
-    ...options
-  };
 }
 
 // ============================================================================
